@@ -1,0 +1,3 @@
+{"ts": 1791561295.572465, "event": "state_change", "region": "b", "to": "UNHEALTHY", "reason": "status=503", "interval_s": 5.0, "threshold": 3, "consecutive_fails": 3}
+{"ts": 1791561312.570364, "event": "state_change", "region": "a", "to": "UNHEALTHY", "reason": "timeout", "interval_s": 5.0, "threshold": 3, "consecutive_fails": 3}
+{"ts": 1791561342.6222222, "event": "state_change", "region": "b", "to": "HEALTHY", "reason": "ok", "interval_s": 5.0, "threshold": 3, "consecutive_oks": 3}

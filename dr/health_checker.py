@@ -30,12 +30,72 @@ URL = {"a": "http://127.0.0.1:8001", "b": "http://127.0.0.1:8002"}
 
 def probe(region: str, timeout: float) -> tuple[bool, str]:
     """TODO: trả về (ready, reason). Timeout PHẢI có — netblock làm request treo mãi."""
-    raise NotImplementedError
+    url = f"{URL[region]}/readyz"
+    try:
+        r = httpx.get(url, timeout=timeout)
+        if r.status_code == 200:
+            return True, "ok"
+        return False, f"status={r.status_code}"
+    except httpx.TimeoutException:
+        return False, "timeout"
+    except Exception as e:
+        return False, f"error={type(e).__name__}"
 
 
 def run(interval: float, timeout: float, threshold: int, duration: float, out: pathlib.Path):
     """TODO: vòng lặp poll + phát hiện transition + ghi JSONL."""
-    raise NotImplementedError
+    states = {
+        "a": {"up": True, "consecutive_fails": 0, "consecutive_oks": 0},
+        "b": {"up": True, "consecutive_fails": 0, "consecutive_oks": 0}
+    }
+    
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w") as f:
+        start_t = time.time()
+        while time.time() - start_t < duration:
+            loop_start = time.time()
+            
+            for region in ["a", "b"]:
+                ready, reason = probe(region, timeout)
+                s = states[region]
+                
+                if ready:
+                    s["consecutive_oks"] += 1
+                    s["consecutive_fails"] = 0
+                    if not s["up"] and s["consecutive_oks"] >= threshold:
+                        s["up"] = True
+                        ev = {
+                            "ts": time.time(), 
+                            "event": "state_change", 
+                            "region": region, 
+                            "to": "HEALTHY", 
+                            "reason": reason,
+                            "interval_s": interval,
+                            "threshold": threshold,
+                            "consecutive_oks": s["consecutive_oks"]
+                        }
+                        f.write(json.dumps(ev) + "\n")
+                        f.flush()
+                else:
+                    s["consecutive_fails"] += 1
+                    s["consecutive_oks"] = 0
+                    if s["up"] and s["consecutive_fails"] >= threshold:
+                        s["up"] = False
+                        ev = {
+                            "ts": time.time(), 
+                            "event": "state_change", 
+                            "region": region, 
+                            "to": "UNHEALTHY", 
+                            "reason": reason,
+                            "interval_s": interval,
+                            "threshold": threshold,
+                            "consecutive_fails": s["consecutive_fails"]
+                        }
+                        f.write(json.dumps(ev) + "\n")
+                        f.flush()
+            
+            elapsed = time.time() - loop_start
+            time.sleep(max(0.0, interval - elapsed))
 
 
 if __name__ == "__main__":
